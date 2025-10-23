@@ -450,28 +450,88 @@ body.dark-mode .timetable-card h3, body.dark-mode .exam-card h3 {
   pointer-events: auto;
 }
 
-.history-btn, .profile-btn {
-  background: rgba(123,63,242,0.12);
-  border: 1px solid rgba(123,63,242,0.25);
-  border-radius: 12px;
-  padding: 8px 14px;
-  color: #7b3ff2;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
+.history-btn {
+  /* Pill-style gradient with left icon */
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(123,63,242,0.08);
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(59,130,246,0.12) 0%, rgba(99,102,241,0.06) 100%);
+  color: #0f172a; /* dark text for contrast */
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid rgba(99,102,241,0.12);
+  box-shadow: 0 6px 18px rgba(59,130,246,0.06), inset 0 -2px 6px rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
-.history-btn:hover, .profile-btn:hover {
-  background: rgba(123,63,242,0.18);
-  border-color: rgba(123,63,242,0.35);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(123,63,242,0.15);
+.history-btn .history-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(59,130,246,0.18);
+  padding: 2px;
 }
+
+.history-btn:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 10px 30px rgba(59,130,246,0.12);
+}
+
+.history-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+}
+
+.profile-btn {
+  /* Compact badge with outline and accent */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  color: #7b3ff2;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1px solid rgba(123,63,242,0.14);
+  box-shadow: 0 6px 18px rgba(123,63,242,0.04);
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.profile-btn .profile-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(180deg,#a259e6,#7b3ff2);
+  box-shadow: 0 4px 10px rgba(123,63,242,0.12);
+}
+
+.profile-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(123,63,242,0.12);
+}
+
+.profile-btn:focus { outline: none; box-shadow: 0 0 0 4px rgba(123,63,242,0.08); }
+
+/* Dark mode variants */
+body.dark-mode .history-btn {
+  background: linear-gradient(90deg, rgba(59,130,246,0.06) 0%, rgba(99,102,241,0.03) 100%);
+  color: #e6eefc;
+  border-color: rgba(99,102,241,0.08);
+}
+
+body.dark-mode .history-btn .history-icon { background: linear-gradient(180deg,#60a5fa,#2563eb); }
+
+body.dark-mode .profile-btn { color: #e7ddff; border-color: rgba(123,63,242,0.22); }
 
 /* Quick action chips */
 .chip-row {
@@ -1864,14 +1924,23 @@ body.dark-mode .intro-main-button:hover {
   box-shadow: 0 16px 40px rgba(123,63,242,0.55);
 }
 
-body.dark-mode .history-btn, 
+body.dark-mode .history-btn {
+  background: rgba(96,165,250,0.15);
+  border-color: rgba(96,165,250,0.3);
+  color: #dbeafe;
+}
+
 body.dark-mode .profile-btn {
   background: rgba(162,89,230,0.15);
   border-color: rgba(162,89,230,0.3);
   color: #d5ceff;
 }
 
-body.dark-mode .history-btn:hover, 
+body.dark-mode .history-btn:hover {
+  background: rgba(96,165,250,0.25);
+  border-color: rgba(96,165,250,0.4);
+}
+
 body.dark-mode .profile-btn:hover {
   background: rgba(162,89,230,0.25);
   border-color: rgba(162,89,230,0.4);

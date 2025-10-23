@@ -75,7 +75,7 @@ const ProfileModal = ({ isOpen, onClose, userContext, onSave }) => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="batch">Batch</label>
+            <label htmlFor="batch">Batch (Year)</label>
             <select 
               id="batch" 
               name="batch" 
@@ -83,11 +83,13 @@ const ProfileModal = ({ isOpen, onClose, userContext, onSave }) => {
               onChange={handleChange}
               required
             >
-              <option value="">Select your batch</option>
-              <option value="A">Batch A</option>
-              <option value="B">Batch B</option>
-              <option value="C">Batch C</option>
-              <option value="D">Batch D</option>
+              <option value="">Select your batch year</option>
+              <option value="2020">2020</option>
+              <option value="2021">2021</option>
+              <option value="2022">2022</option>
+              <option value="2023">2023</option>
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
             </select>
           </div>
 
