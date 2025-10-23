@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import ProfileModal from "./components/ProfileModal";
 import ChatHistoryDrawer from "./components/ChatHistoryDrawer";
 
-// Backend API endpoint (update this when you deploy your backend server)
-const API_BASE = 'http://localhost:4000/api';
+// Gemini API endpoint
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+// Vite exposes env variables prefixed with VITE_ via import.meta.env
+// Avoid direct `process.env` access in the browser (would throw). Use a typeof guard.
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : undefined);
 
 function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   const [messages, setMessages] = useState([]);
@@ -19,6 +22,7 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [isSheetCollapsed, setIsSheetCollapsed] = useState(true); // Start collapsed like original frontend
   const [isTyping, setIsTyping] = useState(false);
+  const [pendingIntent, setPendingIntent] = useState(null); // { type: 'timetable|exam|notes', question: '...' }
   const chatAreaRef = useRef(null);
   const recognitionRef = useRef(null);
   const voiceHideTimeoutRef = useRef(null);
@@ -43,7 +47,7 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollToBottom();
+    setTimeout(scrollToBottom, 100);
   }, [messages]);
 
   // Initialize sheet gestures and focus toggles
@@ -101,12 +105,16 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   };
 
   const scrollToBottom = () => {
+    console.log('scrollToBottom called');
     if (chatAreaRef.current) {
+      console.log('Scrolling to bottom, height:', chatAreaRef.current.scrollHeight);
       // Use smooth scroll behavior for better UX
       chatAreaRef.current.scrollTo({
         top: chatAreaRef.current.scrollHeight,
         behavior: 'smooth'
       });
+    } else {
+      console.log('chatAreaRef.current is null');
     }
   };
 
@@ -122,27 +130,36 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   // Core message functions following original frontend pattern
   const addUserMessage = (text) => {
     const newMessage = { 
+      id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       role: 'user', 
       content: text, 
       timestamp: new Date().toISOString() 
     };
-    const updatedMessages = [...messages, newMessage];
-    setMessages(updatedMessages);
-    saveChatHistory(updatedMessages);
-    return updatedMessages;
+    // Use functional update to avoid stale state when bot reply comes quickly
+    setMessages(prev => {
+      const updated = [...prev, newMessage];
+      saveChatHistory(updated);
+      console.log('Added user message:', text, 'Total messages:', updated.length);
+      return updated;
+    });
+    // No synchronous return; state update will happen asynchronously
   };
 
   const addBotMessage = (text, isHtml = false) => {
     const newMessage = { 
+      id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       role: 'bot', 
       content: text, 
       isHtml,
       timestamp: new Date().toISOString() 
     };
-    const updatedMessages = [...messages, newMessage];
-    setMessages(updatedMessages);
-    saveChatHistory(updatedMessages);
-    return updatedMessages;
+    // Use functional update so we append to the latest messages array
+    setMessages(prev => {
+      const updated = [...prev, newMessage];
+      saveChatHistory(updated);
+      console.log('Added bot message:', (text || '').toString().substring(0, 50) + '...', 'Total messages:', updated.length);
+      return updated;
+    });
   };
 
   const showTypingIndicator = () => {
@@ -156,40 +173,140 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   // Main message sending function following original frontend pattern
   const sendMessage = async () => {
     const text = input.trim();
+    console.log('sendMessage called with text:', text);
     if (!text) return; // Don't send empty messages
 
     // Add user's message to chat
     addUserMessage(text);
-    setInput(''); // Clear input field
+    setInput(""); // Clear input field
     showTypingIndicator();
 
-    try {
-      // Try to send message to backend server
-      const res = await fetch(`${API_BASE}/query`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text: text, 
-          context: userContext // Include student's branch/semester/batch
-        })
-      });
-
-      if (!res.ok) throw new Error('Server error');
-
-      const payload = await res.json();
+    // Check if we have a pending intent to fulfill
+    if (pendingIntent) {
+      const intent = pendingIntent;
+      setPendingIntent(null); // Clear pending
       hideTypingIndicator();
-
-      if (payload.ok) {
-        handleStructuredResponse(payload);
-      } else {
-        addBotMessage(payload.message || 'I ran into a snag. Want to try again?');
-      }
-
-    } catch (error) {
-      // If backend is not available, use offline/mock data
-      hideTypingIndicator();
-      handleOfflineResponse(text);
+      handleIntentFulfillment(intent, text);
+      return;
     }
+
+    // Detect intent keywords
+    const lowerText = text.toLowerCase();
+    if (/timetable|schedule/i.test(lowerText)) {
+      setPendingIntent({ type: 'timetable', question: 'What kind of timetable are you looking for? (e.g., today, this week, by subject)' });
+      hideTypingIndicator();
+      addBotMessage('What kind of timetable are you looking for? (e.g., today, this week, by subject)');
+      return;
+    }
+    if (/exam/i.test(lowerText)) {
+      setPendingIntent({ type: 'exam', question: 'What kind of exam information do you need? (e.g., upcoming exams, exam dates, previous papers)' });
+      hideTypingIndicator();
+      addBotMessage('What kind of exam information do you need? (e.g., upcoming exams, exam dates, previous papers)');
+      return;
+    }
+    if (/notes?|material|study|pdf/i.test(lowerText)) {
+      setPendingIntent({ type: 'notes', question: 'What subject or topic are you looking for notes on? (e.g., Web Technology, DSA, Operating Systems)' });
+      hideTypingIndicator();
+      addBotMessage('What subject or topic are you looking for notes on? (e.g., Web Technology, DSA, Operating Systems)');
+      return;
+    }
+
+    // For conversational messages, use Gemini API if available
+    const convoSnapshot = [...messages, { id: `${Date.now()}-u`, role: 'user', content: text, timestamp: new Date().toISOString() }];
+    if (GEMINI_API_KEY) {
+      try {
+        const reply = await sendToGemini(convoSnapshot);
+        hideTypingIndicator();
+        if (reply) {
+          addBotMessage(reply);
+          return;
+        }
+      } catch (err) {
+        console.error('Gemini call failed:', err);
+        // fallthrough to offline handler
+      }
+    }
+
+    // Fallback: if no API key or Gemini failed, use offline/mock handling
+    hideTypingIndicator();
+    handleOfflineResponse(text);
+  };
+
+  // Handle fulfillment of pending intents based on user's follow-up response
+  const handleIntentFulfillment = (intent, userResponse) => {
+    const lowerResponse = userResponse.toLowerCase();
+    switch (intent.type) {
+      case 'timetable':
+        if (/today|current/i.test(lowerResponse)) {
+          displayTimetable(mockTimetable());
+        } else if (/week|schedule/i.test(lowerResponse)) {
+          displayTimetable(mockTimetable());
+        } else {
+          displayTimetable(mockTimetable()); // Default to full timetable
+        }
+        break;
+      case 'exam':
+        if (/upcoming|dates|schedule/i.test(lowerResponse)) {
+          displayExams(mockExams());
+        } else if (/previous|papers/i.test(lowerResponse)) {
+          displayPDFs(mockPDFs().filter(pdf => pdf.subject.toLowerCase().includes('exam') || pdf.title.toLowerCase().includes('paper')));
+        } else {
+          displayExams(mockExams()); // Default to exam schedule
+        }
+        break;
+      case 'notes':
+        const subject = lowerResponse.match(/(web technology|dsa|operating systems|database|computer networks)/i)?.[1];
+        if (subject) {
+          displayPDFs(mockPDFs().filter(pdf => pdf.subject.toLowerCase().includes(subject.toLowerCase())));
+        } else {
+          displayPDFs(mockPDFs()); // Default to all notes
+        }
+        break;
+      default:
+        addBotMessage("I'm not sure what you mean. Can you clarify?");
+    }
+  };
+
+  // Send the conversation to the Gemini Generative API and return a single text reply.
+  // NOTE: Placing API keys in client-side code is insecure for production. Use a backend proxy for real deployments.
+  const sendToGemini = async (conversation) => {
+
+    // Map local messages to the API's expected message shape
+    const messagesForApi = [
+      { author: 'system', content: [{ type: 'text', text: systemPrompt }] },
+      ...conversation.map(m => ({ author: m.role === 'user' ? 'user' : 'assistant', content: [{ type: 'text', text: String(m.content) }] }))
+    ];
+
+    const body = {
+      messages: messagesForApi,
+      temperature: 0.4,
+      maxOutputTokens: 512,
+      topP: 0.95
+    };
+
+    const res = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini API error ${res.status}: ${errText}`);
+    }
+
+    const payload = await res.json();
+
+    // Try a few common response shapes (Gemini responses vary).
+    // Support: payload.candidates[0].content.parts[0].text OR payload.output_text OR payload.message
+    let textReply = null;
+    if (payload.candidates && payload.candidates.length > 0) {
+      textReply = payload.candidates[0].content?.parts?.[0]?.text || payload.candidates[0].content?.text;
+    }
+    if (!textReply && payload.output_text) textReply = payload.output_text;
+    if (!textReply && payload.message) textReply = typeof payload.message === 'string' ? payload.message : payload.message.text;
+
+    return textReply || null;
   };
 
   // Response handlers following original frontend pattern
@@ -207,6 +324,16 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   };
 
   const handleOfflineResponse = (text) => {
+    // Normalize input for simple intent checks
+    const trimmed = (text || '').trim();
+    const lower = trimmed.toLowerCase();
+
+    // Greeting detection (covers 'hlo', 'hi', 'hello', 'hey', etc.)
+    if (/^\s*(hlo|hi|hello|hey|hiya|sup|good\s(morning|afternoon|evening))\b/i.test(lower)) {
+      addBotMessage(`Hi there! 👋 I'm your GCET College Assistant. How can I help you today?`);
+      return;
+    }
+
     // When backend is not available, show mock/demo data
     if (/timetable|schedule/i.test(text)) {
       displayTimetable(mockTimetable());
@@ -242,7 +369,7 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
       const sectionId = `day-${Date.now()}-${index}`; // Unique ID for toggling
       
       html += `<div class="day-section">`;
-      html += `<div class="day-header" onclick="toggleDay('${sectionId}')">${day.day}<span class="chevron">▾</span></div>`;
+      html += `<div class="day-header" onclick="event.stopPropagation(); toggleDay('${sectionId}')">${day.day}<span class="chevron">▾</span></div>`;
       html += `<div id="${sectionId}" class="day-body">`;
       
       // Add each class period for this day
@@ -588,16 +715,19 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
   };
 
   const renderMessages = () => {
-    return messages.map((message, index) => {
+    console.log('renderMessages called, messages length:', messages.length);
+    return messages.map((message) => {
+      console.log('Rendering message:', message.role, (message.content || '').toString().substring(0, 20));
+      const key = message.id || message.timestamp || Math.random().toString(36).slice(2,8);
       if (message.isHtml) {
         return (
-          <div key={index} className={`message ${message.role}`}>
+          <div key={key} className={`message ${message.role}`}>
             <div className="message-bubble" dangerouslySetInnerHTML={{ __html: message.content }} />
           </div>
         );
       } else {
         return (
-          <div key={index} className={`message ${message.role}`}>
+          <div key={key} className={`message ${message.role}`}>
             <div className="message-bubble">{message.content}</div>
           </div>
         );
@@ -671,15 +801,25 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
           <div className="sheet-header">
             <button 
               className="history-btn"
-              onClick={() => setShowHistory(true)}
+              onClick={() => {
+                console.log('Chat history button clicked');
+                setShowHistory(true);
+              }}
+              type="button"
             >
-              📋 Chat History
+              <span className="history-icon">📋</span>
+              <span>Chat History</span>
             </button>
             <button 
               className="profile-btn"
-              onClick={() => setShowProfileModal(true)}
+              onClick={() => {
+                console.log('Profile button clicked');
+                setShowProfileModal(true);
+              }}
+              type="button"
             >
-              👤 Update Info
+              <span className="profile-dot" aria-hidden="true"></span>
+              <span>Update Info</span>
             </button>
           </div>
         )}
@@ -746,6 +886,7 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
           </div>
           <button 
             className={`circle-btn voice-btn ${isListening ? 'listening' : ''}`}
+            type="button"
             onClick={toggleVoice}
             title="Voice input"
           >
@@ -758,6 +899,7 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
           </button>
           <button 
             className="circle-btn send-btn"
+            type="button"
             onClick={sendMessage}
           >
             ➤
@@ -779,23 +921,20 @@ function ChatBot({ onBackToIntro, theme, onToggleTheme }) {
       )}
 
       {/* Profile Modal */}
-      {showProfileModal && (
-        <ProfileModal
-          userContext={userContext}
-          onSave={saveUserContext}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
+      <ProfileModal
+        isOpen={showProfileModal}
+        userContext={userContext}
+        onSave={saveUserContext}
+        onClose={() => setShowProfileModal(false)}
+      />
 
       {/* Chat History Drawer */}
-      {showHistory && (
-        <ChatHistoryDrawer
-          messages={messages}
-          onSelectMessage={sendQuickMessage}
-          onClearHistory={clearChatHistory}
-          onClose={() => setShowHistory(false)}
-        />
-      )}
+      <ChatHistoryDrawer
+        isOpen={showHistory}
+        chatHistory={messages}
+        onClearHistory={clearChatHistory}
+        onClose={() => setShowHistory(false)}
+      />
 
       {/* PDF Preview Modal */}
       {showPdfPreview && (
