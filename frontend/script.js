@@ -9,7 +9,7 @@
 // ----------------------------------------------------------------------------
 
 // Backend API endpoint (update this when you deploy your backend server)
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = 'http://localhost:3000/api';
 
 // Key used to save/load theme preference from browser storage
 const THEME_KEY = 'gcet_theme';
