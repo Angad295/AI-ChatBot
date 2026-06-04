@@ -4,7 +4,7 @@ Your intelligent college companion powered by Google Gemini AI.
 
 A modern, mobile-first chatbot interface designed specifically for students. This application provides AI-powered assistance for college information, admissions, placements, hostel facilities, and more.
 
-**[🔗 View Live Demo](https://heroic-sorbet-595707.netlify.app)**
+**[🔗 View Live Demo](https://agent-6a213c977131157f6c8b--heroic-sorbet-595707.netlify.app)**
 **[⚙️ Live API Backend](https://ai-chatbot-1-80jj.onrender.com/api/health)**
 
 ---
